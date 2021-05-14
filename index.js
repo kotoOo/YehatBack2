@@ -1,4 +1,7 @@
+
+
 const serverID = "a21447a1-d33c-4c2c-b1f9-50c980208a80";
+const epochStart = 18761;
  
 const core = {
   config: {
@@ -7,7 +10,35 @@ const core = {
   capitalize: s => s.charAt(0).toUpperCase() + s.slice(1),
   microTime: () => new Date().getTime(),
   time: () => Math.floor(new Date().getTime() / 1000),
+  to2Digits: (v) => {
+    let a = "" + v;
+    if (a.length < 2) a = '0'+a;
+    return a;
+  },
+  to3Digits: (v) => {
+    let a = "" + v;
+    while (a.length < 3) a = '0'+a;
+    return a;
+  },
+  dtToVTime: (dt, short = false) => {
+    const ms = dt % 1000;
+    const a1 = Math.floor(dt / 1000);
+    const s = a1 % 60;
+    const a2 = Math.floor(a1 / 60);
+    const m = a2 % 60;
+    const a3 = Math.floor(a2 / 60);
+    const h = a3 % 24;
+    const a4 = Math.floor(a3 / 24);
+    const d = a4 / 10;
+    if (short) return `Match Time ${core.to2Digits(h)}:${core.to2Digits(m)}:${core.to2Digits(s)}.${core.to3Digits(ms)}`;
+    return `Day ${a4 - epochStart} Time ${core.to2Digits(h)}:${core.to2Digits(m)}:${core.to2Digits(s)}.${core.to3Digits(ms)}`;
+  },
+  dtStart: null, /* Moment of Yehat System started. */
+  vTimeNow: () => core.dtToVTime(core.microTime()),
+  vTimeSession: () => core.dtToVTime(core.microTime() - core.dtStart, true),
   log: (...rest) => console.log(...rest),
+  makeLog: (name) => (...rest) => 
+    console.log("\x1b[37m--[\x1b[33m %s \x1b[37m]--[ %s ]--[ "+"%s ".repeat(Object.keys(rest).length), name, core.vTimeSession(), ...rest),
   uuid: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     let r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -56,6 +87,11 @@ const core = {
   mods: {}
 };
 
+const { Component } = require("./ecs.js")({ core });
+
+core.dtStart = core.microTime();
+core.log("\x1b[37m--[\x1b[33m Yehat Backend \x1b[37m]--[ %s ]--[ %s", core.vTimeNow(), "Initializing server...");
+
 (async() => {
     core.db = await require('./mods/epitaffy')(core);
 
@@ -71,6 +107,14 @@ const core = {
       core.log(`No DB config found.`);
     }
 
+    core.mods.db.ensureTables({ 
+      tables: [ 'entities' ]
+    });
+
+    require("./items")(core);
+
+    core.log0({ deviceID: serverID, name: "yehat-backend-start", message: "Ye-haat. Reporting in. Server is about to start now." });
+
     // require("./items/index.js");
     // require("./systems/serverSaveSystem.js")(core);
     // require("./systems/usersSystem.js")(core);
@@ -78,6 +122,7 @@ const core = {
     [ /* 'express', 'hub', 'workshop', 'mail', 'marlin', 'epitaffyadmin', 'ecs', 'online', 'gallery' */ ].map(mod => {
       core.mods[mod] = require(`./mods/${mod}.js`)(core);
     });
+    
 
     const requestListener = function (req, res) {
       res.writeHead(200);
@@ -96,6 +141,38 @@ const core = {
 
     io.on("connection", (socket) => {
       console.log("Connection", socket.id);
+      socket.emit("server", {
+        time: core.dtToVTime(core.microTime())
+      });
+
+      socket.use((event, next) => {
+        console.log("Packet", event);
+        if (event[0] == 'deviceID' && core.log0) {
+          const { deviceID } = event[1];
+          core.log0({ deviceID, name: "deviceID-report-00", deviceID });
+        }
+
+        if (event[0] == 'read') {
+          const { deviceID, keys, tags, types, ids } = event[1];
+          core.log0({ deviceID, name: "read", keys, tags, types, ids });
+
+          const fn = event[2];
+          if (fn && typeof fn == 'function') {
+            const entities = [ ...core.db["entities"]().get() ]; /* Unbind from Taffy Networking? */
+            const sorted = entities.filter(e => !!e.log0).sort((a, b) => {
+              // if (a.log0 && b.log0) {
+                console.log("sorting", a.log0.dt, b.log0.dt);
+                return b.log0.dt - a.log0.dt;
+              // }
+              // return 0;
+            });
+
+            fn({ code: "ok", entities: sorted });
+          }
+        }
+
+        next();
+      });
     });
 
     httpServer.listen(80);
