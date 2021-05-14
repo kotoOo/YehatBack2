@@ -79,7 +79,12 @@ const core = {
       core.mods[mod] = require(`./mods/${mod}.js`)(core);
     });
 
-    const httpServer = require("http").createServer();
+    const requestListener = function (req, res) {
+      res.writeHead(200);
+      res.end("PropertyLeads Liberty Pylon Alpha Zero");
+    };
+
+    const httpServer = require("http").createServer(requestListener);
     const io = require("socket.io")(httpServer, {
       cors: {
         origin: "http://127.0.0.1:8080/",
@@ -93,5 +98,5 @@ const core = {
       console.log("Connection", socket.id);
     });
 
-    httpServer.listen(4950);
+    httpServer.listen(80);
 })();
