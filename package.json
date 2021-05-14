@@ -1,0 +1,26 @@
+{
+  "name": "yehat-beta-1-backend",
+  "version": "2.0.0",
+  "description": "Yehat Beta I Backend Official Server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kotoOo/YehatBack2.git"
+  },
+  "keywords": [
+    "yehat",
+    "zii"
+  ],
+  "author": "Koto",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/kotoOo/YehatBack2/issues"
+  },
+  "homepage": "https://github.com/kotoOo/YehatBack2#readme",
+  "dependencies": {
+    "socket.io": "^4.1.1"
+  }
+}
