@@ -158,7 +158,7 @@ const log = core.makeLog("Core");
     const io = require("socket.io")(httpServer, {
       cors: {
         origin: "*", // http://127.0.0.1:8080/
-        methods: [ "GET", "POST" ],
+        methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
         allowedHeaders: ["my-custom-header"],
         credentials: true
       }
