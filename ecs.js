@@ -79,7 +79,7 @@ module.exports = ({ core }) => {
           [name]: [ ...structure, ...a ] /* naive! should be pureClone */ /* probably very wrong */
         });
       } else { /* Object-style component. class B+ */
-        return (a = {}) => ({ 
+        return (a = {}) => ({
           [name]: { ...structure, ...a } /* naive! should be pureClone */
         });
       }
@@ -153,7 +153,7 @@ module.exports = ({ core }) => {
       }
     }
 
-    log("Entity", entity.meta.name, "methods bound", c);
+    log("Entity", entity.meta ? entity.meta.name : "- no meta -", "methods bound", c);
 
     return entity;
   };
@@ -163,5 +163,99 @@ module.exports = ({ core }) => {
     name: "No name"
   });
 
-  return { Entity, Entity1, loadEntity, Component, install, bindMethods, Meta };
+  /* Moved from /items/logRecords0.js */
+  const SaveTaffy = Component("saveTaffy", {
+    /* ... DYNAMIC Key: component name, Value: True = save all fields, Array = save some fields */
+    type: true,
+    save: (item) => ({ realm = "yehat1" } = {}) => {
+      const a = { id: item.id }; /* Bug fixed!! THINGS w/o ID could pass through before Day 1 20:19 */
+      for (let key in item.saveTaffy) {
+        let v = item.saveTaffy[key];
+
+        if (Array.isArray(v)) {
+          a[key] = {};
+          v.forEach(name => a[key][name] = item[key][name]);
+        } else if (v === true) {
+          a[key] = item[key];
+        } else if (typeof v == "function") {
+          /* That's a method, don't save */
+        }
+      }
+
+      if (realm) a.realm = realm;
+
+      core.db['entities'].merge(a, "id", true);
+      /* */
+      // console.log("!!!", a, core.db['entities']({ id: a.id }).get());
+      //localStorage[`${prefix}-${item.id}`] = JSON.stringify(a);
+      console.log(`[ECS]Saved in Taffy ${item.meta.name} ${item.id}.`);
+    }
+  });
+  /* --- */
+
+  const ecs = {
+    compo: { saveTaffy: SaveTaffy },
+    types: {},
+    root: {},
+    load: ({ realm = "yehat1" } = {}) => {
+      const entities = [ ...core.db['entities']().get() ];
+      return entities;
+    },
+    revive: (en) => {
+      if (en.type && ecs.types[en.type]) { /* if that's one of known types, revival is a one-step process =) */
+        console.log(`Loading known type ${en.type}...`)
+        return ecs.types[en.type](en);
+      } else {
+        console.log(`Loading unknown type ${en.type}...`);
+      }
+
+
+      const newEntity = Entity({ id: en.id });   /* !!!!!!!!!!!!!!!!!!!!!!!!! */
+      for(let key in en) {
+        if (key == 'id') continue;
+
+        if (ecs.compo[key]) { /* if it is a well-known component - we will reconstruct it to install most recent enchantments */
+          newEntity[key] = ecs.compo[key](en[key]);
+        } else { /* if not - we just pass it */
+          newEntity[key] = en[key];
+        }
+      }
+      bindMethods({ entity: newEntity }); /* we lost exclude and special clauses!! aware!! */
+
+      return newEntity;
+    },
+    pipeIn: ({ entities = [] }) => {
+      return entities.map(en => {
+        const newEntity = ecs.revive(en);
+
+        ecs.root[en[id]] = newEntity;
+        return newEntity;
+      });
+    },
+    composeEntity: (a = [], data, specials = [ "save" ], exclude = []) => { /* a - Array of Components, data - object raw data */
+      let b = data;
+      let fn = [];
+      for(let key in a) { /* For each component passed */
+        let component = a[key];
+  
+        for (let name in component) { /* iterating its keys, in 99% there'll be 1 key with the component name itself */
+          if (typeof component[name] == 'object' && !Array.isArray(component[name])) {
+            b[name] = { ...(b[name] || {}), ...component[name], ...(data[name] || {}) }; /* Many mentions of the same component merged */
+          } else if (typeof component[name] == 'object' && Array.isArray(component[name])) {
+            b[name] = data[name] || component[name];
+          } else {
+            b[name] = data[name] || component[name];
+          }
+        }
+      }
+  
+      const en = reactive(b);
+  
+      bindMethods({ entity: en, exclude, specials }); 
+  
+      return en;
+    }
+  };
+
+  return { Entity, Entity1, loadEntity, Component, install, bindMethods, Meta, SaveTaffy, ecs };
 };

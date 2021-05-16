@@ -1,5 +1,6 @@
-module.exports = (core) => {
+module.exports = (core, ecs) => {
   return {
-    ...require("./logRecord0")(core)
+    ...require("./logRecord0")(core, ecs),
+    ...require("./user0")(core, ecs),
   };
 };

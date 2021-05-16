@@ -1,6 +1,7 @@
-
+#!/usr/bin/env node
 
 const serverID = "a21447a1-d33c-4c2c-b1f9-50c980208a80";
+/* "475316bd-47f9-477b-b2ff-b803b7cf6885" at box !! ToDo!! */
 const epochStart = 18761;
  
 const core = {
@@ -30,7 +31,7 @@ const core = {
     const h = a3 % 24;
     const a4 = Math.floor(a3 / 24);
     const d = a4 / 10;
-    if (short) return `Match Time ${core.to2Digits(h)}:${core.to2Digits(m)}:${core.to2Digits(s)}.${core.to3Digits(ms)}`;
+    if (short) return `${core.to2Digits(h)}:${core.to2Digits(m)}:${core.to2Digits(s)}.${core.to3Digits(ms)}`;
     return `Day ${a4 - epochStart} Time ${core.to2Digits(h)}:${core.to2Digits(m)}:${core.to2Digits(s)}.${core.to3Digits(ms)}`;
   },
   dtStart: null, /* Moment of Yehat System started. */
@@ -87,10 +88,12 @@ const core = {
   mods: {}
 };
 
-const { Component } = require("./ecs.js")({ core });
+const { Component, ecs } = require("./ecs.js")({ core });
 
 core.dtStart = core.microTime();
-core.log("\x1b[37m--[\x1b[33m Yehat Backend \x1b[37m]--[ %s ]--[ %s", core.vTimeNow(), "Initializing server...");
+core.log("\x1b[35m--[\x1b[04m Yehat Backend \x1b[m\x1b[35m]--[ %s ]--[ %s\x1b[m", core.vTimeNow(), "Initializing server...");
+
+const log = core.makeLog("Core");
 
 (async() => {
     core.db = await require('./mods/epitaffy')(core);
@@ -111,9 +114,11 @@ core.log("\x1b[37m--[\x1b[33m Yehat Backend \x1b[37m]--[ %s ]--[ %s", core.vTime
       tables: [ 'entities' ]
     });
 
-    require("./items")(core);
+    const treasure = require("./items")(core, ecs);
+    const { makeUser0 } = treasure;
 
     core.log0({ deviceID: serverID, name: "yehat-backend-start", message: "Ye-haat. Reporting in. Server is about to start now." });
+    console.log("treasure", treasure);
 
     // require("./items/index.js");
     // require("./systems/serverSaveSystem.js")(core);
@@ -122,7 +127,27 @@ core.log("\x1b[37m--[\x1b[33m Yehat Backend \x1b[37m]--[ %s ]--[ %s", core.vTime
     [ /* 'express', 'hub', 'workshop', 'mail', 'marlin', 'epitaffyadmin', 'ecs', 'online', 'gallery' */ ].map(mod => {
       core.mods[mod] = require(`./mods/${mod}.js`)(core);
     });
-    
+
+    const userFromDeviceID = (deviceID) => {
+      // const query = core.db.entities({ user0: { deviceID } });
+      const query = core.db.entities(function() {  /* This is an analogue of pre-reactive ORM languages and hopefully we'll
+                                                      get out of this territory soon. For the glory! */
+        const entity = this;
+        if (entity.user0 && ~entity.user0.deviceIDs.indexOf(deviceID)) return true;
+        if (entity.user0) console.log("user in DB", entity);
+        return false;
+      });
+      const a = query.get();
+
+      if (!a.length) return null;
+
+      const user0 = ecs.revive(a[0]);
+
+      // console.log("user from deviceID", deviceID, user0);
+
+      /* return makeUser0(a[0]); */ /* WRONG!! this function ain't supposed to get plain entity as an input!! */
+      return user0;
+    };
 
     const requestListener = function (req, res) {
       res.writeHead(200);
@@ -132,7 +157,7 @@ core.log("\x1b[37m--[\x1b[33m Yehat Backend \x1b[37m]--[ %s ]--[ %s", core.vTime
     const httpServer = require("http").createServer(requestListener);
     const io = require("socket.io")(httpServer, {
       cors: {
-        origin: "http://127.0.0.1:8080/",
+        origin: "*", // http://127.0.0.1:8080/
         methods: [ "GET", "POST" ],
         allowedHeaders: ["my-custom-header"],
         credentials: true
@@ -140,38 +165,173 @@ core.log("\x1b[37m--[\x1b[33m Yehat Backend \x1b[37m]--[ %s ]--[ %s", core.vTime
     });
 
     io.on("connection", (socket) => {
+      socket.data = {
+        dtSessionStart: core.microTime()
+      };
+
+      const SVTime = () => core.microTime() - socket.data.dtSessionStart;
+      const UpTime = () => core.microTime() - core.dtStart;
+
       console.log("Connection", socket.id);
       socket.emit("server", {
         time: core.dtToVTime(core.microTime())
       });
 
-      socket.use((event, next) => {
-        console.log("Packet", event);
+      socket.use(async (event, next) => {
+        if (!Array.isArray(event)) return next();
+        console.log(">=", event[0], event[1]);
+
+        const fn = event[2];
+        const reply = (a) => {
+          if (fn) {
+            return fn(a);
+          } else {
+            console.log("socket.id missed acknoledgement.", a);
+          }
+        };
+
+
+
         if (event[0] == 'deviceID' && core.log0) {
+          const now = +new Date();
           const { deviceID } = event[1];
-          core.log0({ deviceID, name: "deviceID-report-00", deviceID });
+          core.log0({ deviceID, name: "deviceID-report-00", deviceID, svTime: SVTime() });
+          socket.data = {
+            ...socket.data,
+            deviceID,
+            pathPoints: 0
+          };
+
+          const user = userFromDeviceID(deviceID);
+          if (user) {
+            socket.data.userID = user.id;
+            socket.data.sessonID = core.uuid();
+            
+            console.log("connected user by deviceID", user.id);
+            user.user0.sessionID = socket.data.sessonID;
+            user.user0vtm.socketID = socket.id;
+            user.user0vtm.dtSessionStart = now;
+            user.user0vtm.dtLastActivity = now;
+            user.user0vtm.online = true;
+            user.save();
+          }
         }
 
         if (event[0] == 'read') {
-          const { deviceID, keys, tags, types, ids } = event[1];
-          core.log0({ deviceID, name: "read", keys, tags, types, ids });
+          const { keys, tags, types, ids } = event[1];
+          const { deviceID } = socket.data;
+          core.log0({ deviceID, name: "read", keys, tags, types, ids, svTime: SVTime() });
 
           const fn = event[2];
           if (fn && typeof fn == 'function') {
             const entities = [ ...core.db["entities"]().get() ]; /* Unbind from Taffy Networking? */
+
+            /* Benchmark!! */
+
             const sorted = entities.filter(e => !!e.log0).sort((a, b) => {
               // if (a.log0 && b.log0) {
-                console.log("sorting", a.log0.dt, b.log0.dt);
+                // console.log("sorting", a.log0.dt, b.log0.dt);
                 return b.log0.dt - a.log0.dt;
               // }
               // return 0;
             });
 
+            /* -- */
+
             fn({ code: "ok", entities: sorted });
           }
         }
 
+        if (event[0] == 'reportRouting') {
+          const { page, fromPage, path } = event[1];
+          const { deviceID } = socket.data;
+          core.log0({ name: "routing", deviceID, page, fromPage, path, svTime: SVTime() });
+          socket.data.pathPoints++;
+
+          const fn = event[2] || (() => {});
+          fn({ code: "ok", pathPoints: socket.data.pathPoints });
+        }
+
+        if (event[0] == 'restart') {
+          const { deviceID } = socket.data;
+
+          log("Yehat backend shutting down...");
+          core.log0({ name: "yehat-backend-restart", deviceID, svTime: SVTime(), uptime: UpTime() });
+
+          const fn = event[2] || (() => {});
+          fn({ code: "ok" });
+        
+          await core.ms(250).then(() => {
+            httpServer.close();
+
+            // process.on("exit", function () {
+            require("child_process").spawn("cmd", [ "start cmd" ], {
+              cwd: process.cwd(),
+              detached : true,
+              stdio: "inherit"
+            });
+            // // });
+            process.exitCode = 1;
+            process.exit(1);
+            // process.exit();
+          });
+        }
+
+        if (event[0] == 'user0') {
+          const { deviceID } = socket.data;
+          const existing = userFromDeviceID(deviceID);
+
+          if (existing) {
+            reply({ code: "ok", user0: existing });
+            core.log0({ name: "user-existing", deviceID, userID: existing.id, svTime: SVTime(), uptime: UpTime() });
+            next(); return;
+          }
+
+          const user0 = makeUser0({ deviceID, socketID: socket.id });
+          user0.save();
+          core.log0({ name: "user-created", deviceID, userID: user0.id, svTime: SVTime(), uptime: UpTime() });
+          reply({ code: "ok", user0 });
+        }
+
+        if (event[0] == 'room0') {
+          const { at } = event[1];
+          const all = core.db.entities(function(entity) {
+            if (at) {
+              return this.id === at || this.type === at;
+            } else {
+              return this.id ? true : false;
+            }
+          }).get();
+
+          const types = {}; /* keys: types, values: how many times met */
+          const compos = {}; /* keys: compo names, values: how many times met */
+          all.map(item => {
+            types[item.type] = (types[item.type] || 0) + 1;
+            Object.keys(item).map(key => {
+              compos[key] = (compos[key] || 0) + 1;
+            });
+          });
+
+          reply({ code: "ok", types, compos, total: all.length });
+        }
+
         next();
+      });
+
+      socket.on("disconnect", (reason) => {
+        const { deviceID } = socket.data;
+
+        const user = userFromDeviceID(deviceID);
+        if (user) {
+          // console.log("disconnected user by deviceID", user);
+          user.user0.sessionID = null;
+          user.user0vtm.socketID = null;
+          user.user0vtm.dtLastActivity = +new Date();
+          user.user0vtm.online = false;
+          user.save();
+        }
+
+        core.log0({ name: "disconnect", deviceID, svTime: SVTime(), uptime: UpTime(), reason });
       });
     });
 
