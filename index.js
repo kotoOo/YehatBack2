@@ -115,7 +115,7 @@ const log = core.makeLog("Core");
     });
 
     const treasure = require("./items")(core, ecs);
-    const { makeUser0 } = treasure;
+    const { makeUser0, makeUser1, upgradeUser0ToUser1 } = treasure;
 
     core.log0({ deviceID: serverID, name: "yehat-backend-start", message: "Ye-haat. Reporting in. Server is about to start now." });
     console.log("treasure", treasure);
@@ -194,7 +194,7 @@ const log = core.makeLog("Core");
 
         if (event[0] == 'deviceID' && core.log0) {
           const now = +new Date();
-          const { deviceID } = event[1];
+          const { deviceID, userObject } = event[1]; /* userObject is incoming, but how do we pipe it through? */
           core.log0({ deviceID, name: "deviceID-report-00", deviceID, svTime: SVTime() });
           socket.data = {
             ...socket.data,
@@ -206,14 +206,30 @@ const log = core.makeLog("Core");
           if (user) {
             socket.data.userID = user.id;
             socket.data.sessonID = core.uuid();
+
+            if (user.type == 'user0' && userObject) {
+              upgradeUser0ToUser1(user, userObject);
+            }
             
-            console.log("connected user by deviceID", user.id);
+            console.log("connected user by deviceID", user.id, user.type);
             user.user0.sessionID = socket.data.sessonID;
             user.user0vtm.socketID = socket.id;
             user.user0vtm.dtSessionStart = now;
             user.user0vtm.dtLastActivity = now;
             user.user0vtm.online = true;
             user.save();
+          } else {
+            /* create user based on userObject */
+            if (userObject) {
+              const user1 = makeUser1({ deviceID, socketID: socket.id, userObject });
+              user1.save();
+              core.log0({ name: "user-created", type: "user1", deviceID, userID: user0.id, svTime: SVTime(), uptime: UpTime() });
+            } else {
+              const user0 = makeUser0({ deviceID, socketID: socket.id, userID: userObject.user_name });
+              user0.save();
+              core.log0({ name: "user-created", type: "user0", deviceID, userID: user0.id, svTime: SVTime(), uptime: UpTime() });
+            }
+            // reply({ code: "ok", user0 });
           }
         }
 
@@ -312,7 +328,7 @@ const log = core.makeLog("Core");
             });
           });
 
-          reply({ code: "ok", types, compos, total: all.length });
+          reply({ code: "ok", types, compos, total: all.length, top: all.slice(0, 4) });
         }
 
         next();

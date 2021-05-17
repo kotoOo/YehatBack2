@@ -19,6 +19,36 @@ module.exports = (core, ecs) => {
     online: false
   });
 
+  const UserAccess0 = Component("userAccess0", {
+    additional_standard_per: null,
+    affiliate: null,
+    billing_period_start: null,
+    coupon_affiliate_code: {},
+    monthly_const: null,
+    plan_base_rate: 0,
+    plan_schedule: 'monthly',
+    plan_type: null,
+    plans: [],
+    skiptracing_cost_per_hit: 0,
+    standard_stripe_sub_id: null
+  });
+
+  const User1 = Component("user1", {
+    user_name: null,
+    stripe_customer_id: null,
+    email_address: null,
+    first_name: null,
+    last_name: null,
+    company: null,
+    added_ts: null,
+    active: false,
+    srtipe_card_id: null,
+    stripe_card_last4: null,    
+    rumored: '',
+    phone: null,
+    user_access: UserAccess0().userAccess0    
+  });
+
   // const User0Entity = ({ id, ...a }) => loadEntity([ /* here passed DEFAULT values for all component constructors, actual data will
   //     be hydrated from Taffy */
   //   { type: "user0" },
@@ -65,8 +95,6 @@ module.exports = (core, ecs) => {
     return user;
   };
 
-  
-
   // ecs.types.user0 = makeUser0; // bad
   ecs.types.user0 = ({ ...data }) => {
     const user = ecs.composeEntity([
@@ -86,8 +114,52 @@ module.exports = (core, ecs) => {
     return user;
   };
 
+  const upgradeUser0ToUser1 = (user, userObject) => { /* won't save */
+    user.type = "user1";
+    user.user1 = User1({
+      ...userObject,
+      user_access: UserAccess0(userObject.user_access)
+    });
+    user.saveTaffy.user1 = true;
+    user.user0.level = 1;
+    user.user0.origin = "listability";
+    user.user0.memberID = userObject.user_name;
+    user.user0.name = `${userObject.first_name} ${userObject.last_name}`;
+    user.user0.status = "Hey, I'm a ListAbility user.";
+  };
+
+  const makeUser1 = ({ id, socketID, deviceID, userObject, ...a }) => { 
+    const user = makeUser0({ id, socketID, deviceID, ...a });
+
+    upgradeUser0ToUser1(user, userObject);
+    user.save();
+
+    return user;
+  };
+
+  
+
+  ecs.types.user1 = ({ ...data }) => {
+    const user = ecs.composeEntity([
+      SaveTaffy({
+        user0: true,
+        user1: true,
+        user0vtm: true,
+        type: true
+      }),
+      Meta({
+        name: "Yehat User",
+        type: "Account"
+      })
+    ], data);
+
+    // console.log("hydrated", user);
+
+    return user;
+  };
+
   /* ecs.createUser0 .... meow meow meow ... */
 
 
-  return { User0, makeUser0 };
+  return { User0, makeUser0, makeUser1, upgradeUser0ToUser1 };
 };
