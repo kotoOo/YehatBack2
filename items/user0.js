@@ -135,9 +135,7 @@ module.exports = (core, ecs) => {
     user.save();
 
     return user;
-  };
-
-  
+  }; 
 
   ecs.types.user1 = ({ ...data }) => {
     const user = ecs.composeEntity([
