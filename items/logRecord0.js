@@ -39,6 +39,10 @@ module.exports = (core, ecs) => {
     });
 
     logRecord.save();
+
+    if (core.io) core.io.to("log0").emit("e", logRecord);
+
+    return logRecord;
   };
 
 

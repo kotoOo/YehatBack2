@@ -164,6 +164,8 @@ const log = core.makeLog("Core");
       }
     });
 
+    core.io = io;
+
     io.on("connection", (socket) => {
       socket.data = {
         dtSessionStart: core.microTime()
@@ -358,7 +360,26 @@ const log = core.makeLog("Core");
           const items = core.db.entities(function(entity) {            
             return !!this.user1;
           }).get();
-          reply({ code: "ok", items })
+          reply({ code: "ok", items });
+        }
+
+        if (event[0] == "rjoin") {
+          const { room } = event[1];
+          socket.join(room);
+
+          const { deviceID, userID } = socket.data;
+          core.log0({ name: "rjoin", deviceID, userID, room, svTime: SVTime(), uptime: UpTime() });
+          reply({ code: "ok" });
+        }
+
+        if (event[0] == "rleave") {
+          const { room } = event[1];
+          socket.leave(room);
+
+          const { deviceID, userID } = socket.data;
+          core.log0({ name: "rleave", deviceID, userID, room, svTime: SVTime(), uptime: UpTime() });
+
+          reply({ code: "ok" });
         }
 
         next();
