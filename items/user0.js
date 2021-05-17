@@ -1,7 +1,7 @@
 module.exports = (core, ecs) => {
-  const { loadEntity, Component, Meta, SaveTaffy } = require("../ecs")({ core });
+  const { loadEntity, Meta, SaveTaffy } = require("../ecs")({ core });
 
-  const User0 = Component("user0", {
+  const User0 = ecs.define("user0", {
     sessionID: null, /* websocketID from server's perspective. null when user is offline. */
     deviceIDs: [],
     memberID: null, /* in host system - PL */
@@ -11,7 +11,7 @@ module.exports = (core, ecs) => {
     level: 0
   });
 
-  const User0VTM = Component("user0vtm", {
+  const User0VTM = ecs.define("user0vtm", {
     socketID: null,
     dtCreated: null,
     dtSessionStart: null,
@@ -19,7 +19,7 @@ module.exports = (core, ecs) => {
     online: false
   });
 
-  const UserAccess0 = Component("userAccess0", {
+  const UserAccess0 = ecs.define("userAccess0", {
     additional_standard_per: null,
     affiliate: null,
     billing_period_start: null,
@@ -33,7 +33,7 @@ module.exports = (core, ecs) => {
     standard_stripe_sub_id: null
   });
 
-  const User1 = Component("user1", {
+  const User1 = ecs.define("user1", {
     user_name: null,
     stripe_customer_id: null,
     email_address: null,

@@ -331,6 +331,36 @@ const log = core.makeLog("Core");
           reply({ code: "ok", types, compos, total: all.length, top: all.slice(0, 4) });
         }
 
+        if (event[0] == 'runScript') {
+          const { exec } = require("child_process");
+          const runScript = (path) => new Promise((resolve, reject) => {
+            const handle = exec(path,
+              (error, stdout, stderr) => {
+                if (error !== null) {
+                  console.log(`exec error: ${error}`, stderr);
+                  return reject({ error, stderr });
+                }
+
+                resolve(stdout);        
+              }
+            );
+          });
+          const { path } = event[1];
+          try {
+            const output = await runScript(path);
+            reply({ code: "ok", details: output });
+          } catch(e) {
+            reply({ code: "fail", details: e.message });
+          }
+        }
+
+        if (event[0] == 'userlist') {
+          const items = core.db.entities(function(entity) {            
+            return !!this.user1;
+          }).get();
+          reply({ code: "ok", items })
+        }
+
         next();
       });
 

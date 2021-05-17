@@ -1,7 +1,7 @@
-module.exports = (core) => {
-  const { loadEntity, Component, Meta, SaveTaffy } = require("../ecs")({ core });
+module.exports = (core, ecs) => {
+  const { loadEntity, Meta, SaveTaffy } = require("../ecs")({ core });
 
-  const LogRecord0 = Component("log0", {
+  const LogRecord0 = ecs.define("log0", {
     deviceID: null,
     dt: null,
     vTime: null, /* Epoch time, started at 14th May '21 */
@@ -11,6 +11,8 @@ module.exports = (core) => {
     sessionID: null,
     ip: null
   });
+
+  //ecs.compo.log0 = logRecord0;
 
   const makeLogRecord0 = ({ id, ...a }) => loadEntity([
     { type: "log0" },

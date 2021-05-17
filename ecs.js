@@ -197,6 +197,10 @@ module.exports = ({ core }) => {
     compo: { saveTaffy: SaveTaffy },
     types: {},
     root: {},
+    define: (name, def) => {
+      ecs.compo[name] = Component(name, def);
+      return ecs.compo[name];
+    },
     load: ({ realm = "yehat1" } = {}) => {
       const entities = [ ...core.db['entities']().get() ];
       return entities;
