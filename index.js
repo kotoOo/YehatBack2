@@ -410,7 +410,7 @@ const log = core.makeLog("Core");
           const { id } = event[1];
           const { deviceID, userID } = socket.data;
 
-          core.log0({ name: "e-delete", entityID: id, deviceID, userID, room, svTime: SVTime(), uptime: UpTime() });
+          core.log0({ name: "e-delete", entityID: id, deviceID, userID, svTime: SVTime(), uptime: UpTime() });
           core.db.entities(id).remove();          
 
           reply({ code: "ok" });
