@@ -195,7 +195,7 @@ const log = core.makeLog("Core");
 
       socket.use(async (event, next) => {
         if (!Array.isArray(event)) return next();
-        console.log(">=", event[0], event[1]);
+        console.log(">=", event[0], JSON.stringify(event[1]).length, 'Bytes');
 
         const fn = event[2];
         const reply = (a) => {
