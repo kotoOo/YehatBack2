@@ -144,7 +144,7 @@ const log = core.makeLog("Core");
                                                       get out of this territory soon. For the glory! */
         const entity = this;
         if (entity.user0 && ~entity.user0.deviceIDs.indexOf(deviceID)) return true;
-        if (entity.user0) console.log("user in DB", entity);
+        // if (entity.user0) console.log("user in DB", entity);
         return false;
       });
       const a = query.get();
