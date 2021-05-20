@@ -243,6 +243,7 @@ const log = core.makeLog("Core");
             /* create user based on userObject */
             if (userObject && userObject.first_name != undefined) {
               const user1 = makeUser1({ deviceID, socketID: socket.id, userObject });
+              console.log("makeUser1", user1);
               user1.save();
               core.log0({ name: "user-created", type: "user1", deviceID, userID: user0.id, svTime: SVTime(), uptime: UpTime() });
 
@@ -383,7 +384,7 @@ const log = core.makeLog("Core");
         if (event[0] == 'userlist') {
           const items = core.db.entities(function(entity) {            
             return !!this.user1;
-          }).get();
+          }).get().map(({ ___id, ___s, ...a }) => a);
           reply({ code: "ok", items });
         }
 
@@ -444,7 +445,6 @@ const log = core.makeLog("Core");
       setInterval(() => {
         io.to("online0").emit("stat0", onlineStat0.stat0);
       }, 5000);
-
     });
 
     httpServer.listen(80);

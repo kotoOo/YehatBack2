@@ -118,8 +118,8 @@ module.exports = (core, ecs) => {
     user.type = "user1";
     user.user1 = User1({
       ...userObject,
-      user_access: UserAccess0(userObject.user_access)
-    });
+      user_access: UserAccess0(userObject.user_access).userAccess0
+    }).user1;
     user.saveTaffy.user1 = true;
     user.user0.level = 1;
     user.user0.origin = "listability";
