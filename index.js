@@ -115,7 +115,7 @@ const log = core.makeLog("Core");
     });
 
     const treasure = require("./items")(core, ecs);
-    const { makeUser0, makeUser1, upgradeUser0ToUser1 } = treasure;
+    const { makeUser0, makeUser1, upgradeUser0ToUser1, makeStat0 } = treasure;
 
     core.log0({ deviceID: serverID, name: "yehat-backend-start", message: "Ye-haat. Reporting in. Server is about to start now." });
     console.log("treasure", treasure);
@@ -126,6 +126,16 @@ const log = core.makeLog("Core");
     
     [ /* 'express', 'hub', 'workshop', 'mail', 'marlin', 'epitaffyadmin', 'ecs', 'online', 'gallery' */ ].map(mod => {
       core.mods[mod] = require(`./mods/${mod}.js`)(core);
+    });
+
+    const onlineStat0 = makeStat0({ 
+      id: "591191f9-ce0c-4d42-9263-aa86e8b83507",
+      name: "online0",
+      value: {
+        total: 0,
+        user: 0,
+        guest: 0
+      }
     });
 
     const userFromDeviceID = (deviceID) => {
@@ -174,7 +184,11 @@ const log = core.makeLog("Core");
       const SVTime = () => core.microTime() - socket.data.dtSessionStart;
       const UpTime = () => core.microTime() - core.dtStart;
 
-      console.log("Connection", socket.id);
+      // console.log("Connection", socket.id);
+
+      onlineStat0.stat0.value.total++;
+      onlineStat0.stat0.value.guest++;
+
       socket.emit("server", {
         time: core.dtToVTime(core.microTime())
       });
@@ -192,8 +206,6 @@ const log = core.makeLog("Core");
           }
         };
 
-
-
         if (event[0] == 'deviceID' && core.log0) {
           const now = +new Date();
           const { deviceID, userObject } = event[1]; /* userObject is incoming, but how do we pipe it through? */
@@ -209,27 +221,39 @@ const log = core.makeLog("Core");
             socket.data.userID = user.id;
             socket.data.sessonID = core.uuid();
 
-            if (user.type == 'user0' && userObject) {
+            if (user.type == 'user0' && userObject && userObject.first_name != undefined) {
               upgradeUser0ToUser1(user, userObject);
             }
             
-            console.log("connected user by deviceID", user.id, user.type);
+            if (user.type == "user1") {
+              log(`Connected user ${user.user0.name} (${user.id})`);
+            } else {
+              log("Connected user: by deviceID", user.id, user.type);
+            }
             user.user0.sessionID = socket.data.sessonID;
             user.user0vtm.socketID = socket.id;
             user.user0vtm.dtSessionStart = now;
             user.user0vtm.dtLastActivity = now;
             user.user0vtm.online = true;
             user.save();
+
+            onlineStat0.stat0.value.guest--;
+            onlineStat0.stat0.value.user++;
           } else {
             /* create user based on userObject */
-            if (userObject) {
+            if (userObject && userObject.first_name != undefined) {
               const user1 = makeUser1({ deviceID, socketID: socket.id, userObject });
               user1.save();
               core.log0({ name: "user-created", type: "user1", deviceID, userID: user0.id, svTime: SVTime(), uptime: UpTime() });
+
+              onlineStat0.stat0.value.guest--;
+              onlineStat0.stat0.value.user++;
             } else {
               const user0 = makeUser0({ deviceID, socketID: socket.id, userID: userObject.user_name });
               user0.save();
               core.log0({ name: "user-created", type: "user0", deviceID, userID: user0.id, svTime: SVTime(), uptime: UpTime() });
+              onlineStat0.stat0.value.guest--;
+              onlineStat0.stat0.value.user++;
             }
             // reply({ code: "ok", user0 });
           }
@@ -382,6 +406,16 @@ const log = core.makeLog("Core");
           reply({ code: "ok" });
         }
 
+        if (event[0] == "e-delete") {
+          const { id } = event[1];
+          const { deviceID, userID } = socket.data;
+
+          core.log0({ name: "e-delete", entityID: id, deviceID, userID, room, svTime: SVTime(), uptime: UpTime() });
+          core.db.entities(id).remove();          
+
+          reply({ code: "ok" });
+        }
+
         next();
       });
 
@@ -396,10 +430,21 @@ const log = core.makeLog("Core");
           user.user0vtm.dtLastActivity = +new Date();
           user.user0vtm.online = false;
           user.save();
+          
+          onlineStat0.stat0.value.user--;
+          onlineStat0.stat0.value.total--;
+        } else {
+          onlineStat0.stat0.value.guest--;
+          onlineStat0.stat0.value.total--;
         }
 
         core.log0({ name: "disconnect", deviceID, svTime: SVTime(), uptime: UpTime(), reason });
       });
+
+      setInterval(() => {
+        io.to("online0").emit("stat0", onlineStat0.stat0);
+      }, 5000);
+
     });
 
     httpServer.listen(80);
