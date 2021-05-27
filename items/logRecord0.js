@@ -26,7 +26,9 @@ module.exports = (core, ecs) => {
     })
   ], core)({ id: id || core.uuid(), specials: [ "save" ] });
 
-  core.log0 = ({ deviceID, svTime, ...a }) => {
+  core.log0 = ({ deviceID, svTime, socket = null, ...a }) => { /* now svTime might be auto inferred from socket */
+    const SVTime = (socket) => core.microTime() - socket.data.dtSessionStart;   
+
     const logRecord = makeLogRecord0({
       deviceID,
       dt: core.time(),
@@ -35,7 +37,9 @@ module.exports = (core, ecs) => {
       details: JSON.stringify(a),
       sessionID: null,
       ip: null,
-      svTime: svTime ? core.dtToVTime(svTime, true) : null
+      svTime: svTime ? core.dtToVTime(svTime, true) : (
+        socket ? SVTime(socket) : null
+      )
     });
 
     logRecord.save();

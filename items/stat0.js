@@ -7,17 +7,22 @@ module.exports = (core, ecs) => {
     dt: null
   });
 
-  const makeStat0 = ({ id, ...a }) => loadEntity([
-    { type: "stat0" },
-    Stat0(a),
-    SaveTaffy({
-      stat0: true
-    }),
-    Meta({
-      name: "Stat 0",
-      type: "Counter"
-    })
-  ], core)({ id: id || core.uuid(), specials: [ "save" ] });
+  const makeStat0 = ({ id, ...a }) => {
+    const stat0 = loadEntity([
+      { type: "stat0" },
+      Stat0(a),
+      SaveTaffy({
+        stat0: true
+      }),
+      Meta({
+        name: "Stat 0",
+        type: "Counter"
+      })
+    ], core)({ id: id || core.uuid(), specials: [ "save" ] });
+
+    ecs.root[stat0.id] = stat0;
+    return stat0;
+  };
 
   return { Stat0, makeStat0 };
 };
