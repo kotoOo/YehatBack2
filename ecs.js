@@ -158,48 +158,26 @@ module.exports = ({ core }) => {
     return entity;
   };
 
-  const Meta = Component('meta', {
-    type: "Unknown",
-    name: "No name"
-  });
-
-  /* Moved from /items/logRecords0.js */
-  const SaveTaffy = Component("saveTaffy", {
-    /* ... DYNAMIC Key: component name, Value: True = save all fields, Array = save some fields */
-    type: true,
-    save: (item) => ({ realm = "yehat1" } = {}) => {
-      const a = { id: item.id }; /* Bug fixed!! THINGS w/o ID could pass through before Day 1 20:19 */
-      for (let key in item.saveTaffy) {
-        let v = item.saveTaffy[key];
-
-        if (Array.isArray(v)) {
-          a[key] = {};
-          v.forEach(name => a[key][name] = item[key][name]);
-        } else if (v === true) {
-          a[key] = item[key];
-        } else if (typeof v == "function") {
-          /* That's a method, don't save */
-        }
-      }
-
-      if (realm) a.realm = realm;
-
-      core.db['entities'].merge(a, "id", true);
-      /* */
-      // console.log("!!!", a, core.db['entities']({ id: a.id }).get());
-      //localStorage[`${prefix}-${item.id}`] = JSON.stringify(a);
-      console.log(`[ECS]Saved in Taffy ${item.meta.name} ${item.id}.`);
-    }
-  });
+  
   /* --- */
 
   const ecs = {
-    compo: { saveTaffy: SaveTaffy },
+    compo: {},
+    compopedia: {},
     types: {},
+    typeopedia: {},
     root: {},
+    loadEntity,
+    bindMethods,
     define: (name, def) => {
       ecs.compo[name] = Component(name, def);
       return ecs.compo[name];
+    },
+    declareType: (name, def = [], typeopedia = { details: "No details." }) => {
+      /* def - Array of components or Function - constructor */
+      ecs.types[name] = typeof def == "function" ? def : (input) => loadEntity(def)(input);
+      ecs.typeopedia[name] = typeopedia;
+      return ecs.types[name];
     },
     load: ({ realm = "yehat1" } = {}) => {
       const entities = [ ...core.db['entities']().get() ];
@@ -260,6 +238,51 @@ module.exports = ({ core }) => {
       return en;
     }
   };
+
+  const Meta = ecs.define('meta', {
+    type: "Unknown",
+    name: "No name"
+  }, { details: `General meta-information about an Entity, such its "type" (archetype, classification of the Entity Class 
+    amongst other Entity Classes), and its "name" (Entity Class name, arbitrary).` });
+
+  /* Moved from /items/logRecords0.js */
+  const SaveTaffy = ecs.define("saveTaffy", {
+    /* ... DYNAMIC Key: component name, Value: True = save all fields, Array = save some fields */
+    type: true,
+    save: (item) => ({ realm = "yehat1" } = {}) => {
+      const a = { id: item.id }; /* Bug fixed!! THINGS w/o ID could pass through before Day 1 20:19 */
+      for (let key in item.saveTaffy) {
+        let v = item.saveTaffy[key];
+
+        if (Array.isArray(v)) {
+          a[key] = {};
+          v.forEach(name => a[key][name] = item[key][name]);
+        } else if (v === true) {
+          a[key] = item[key];
+        } else if (typeof v == "function") {
+          /* That's a method, don't save */
+        }
+      }
+
+      if (realm) a.realm = realm;
+
+      core.db['entities'].merge(a, "id", true);
+      /* */
+      // console.log("!!!", a, core.db['entities']({ id: a.id }).get());
+      //localStorage[`${prefix}-${item.id}`] = JSON.stringify(a);
+      console.log(`[ECS]Saved in Taffy ${item.meta.name} ${item.id}.`);
+    }
+  }, { details: "Information about what components in this Entity are to be save in Taffy DB." });
+
+  /* The ONE and THE ONLY TRUE AUTHENTHIC ENTITY FACTORY in ZII ECS */
+  ecs.declareType(
+    "Entity", 
+    (a = {}) => reactive({ id: core.uuid(), ...a }), 
+    { 
+      details: "[ The ONE and THE ONLY TRUE AUTHENTHIC ENTITY FACTORY in ZII ECS ]-[ Lvl 4 ]" 
+    }
+  );
+  /* --[ Lvl 4 ] -------------------------------------------------- */
 
   return { Entity, Entity1, loadEntity, Component, install, bindMethods, Meta, SaveTaffy, ecs };
 };

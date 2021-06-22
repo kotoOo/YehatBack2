@@ -1,8 +1,12 @@
 module.exports = (core, ecs) => {
+  const noLog = [ "events0.move" ];
+
   const noAck = () => {};
   const makeDirectIOModInterface = ({ socket }) => 
     ([ cmd, props = {}, ack = noAck ], next) => {
-      console.log("[DirectIOModInterface]", cmd, props, ack == noAck ? "No Ack function!" : "");
+      if (!~noLog.indexOf(cmd)) {
+        console.log("[DirectIOModInterface]", cmd, props, ack == noAck ? "No Ack function!" : "");
+      }
       if (typeof cmd != "string") return next();
       if (typeof props != "object") return next();
 
@@ -42,7 +46,9 @@ module.exports = (core, ecs) => {
       }
 
       try {
-        const output = theMod[meth]({ ...props, socket }); /* <= should pass basic user data here already! */
+        const { userID, sessionID } = socket.data;
+
+        const output = theMod[meth](props, { socket, userID, sessionID }); /* <= should pass basic user data here already! */
         if (ack) ack(output);
 
       } catch(e) {

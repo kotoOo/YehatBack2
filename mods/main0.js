@@ -1,7 +1,7 @@
 module.exports = (core, ecs) => {
   const log = core.makeLog("main0");
 
-  const ioDeviceID = ({ deviceID, userObject, socket, yehatPass }, b, c) => {
+  const ioDeviceID = ({ deviceID, userObject, yehatPass }, { socket }, c) => {
     log("ioDeviceID", deviceID, userObject, socket, yehatPass);
 
     if (!core.log0) {
@@ -87,7 +87,66 @@ module.exports = (core, ecs) => {
     }    
   };
 
+  const ioSaveEntity = ({ entity = {}, access = "private" }, { socket, userID, sessionID }) => {
+    console.log("=> save entity", entity, userID, sessionID);
+
+    if (!entity.id) entity.id = core.uuid();
+
+    const exists = core.db.entities({ id: entity.id }).get().length;
+
+    console.log("..:", exists ? "Exists" : "Doesn't Exist");
+    const { owner0 } = ecs.compo;
+    if (!exists) {
+      const item = {
+        ...entity,
+        ...owner0({ userID, access })
+      };
+      core.db.entities.insert(item);
+    }
+
+    return { code: "ok", id: entity.id };
+  };
+
+  const ioByOwner = ({ userID: lookForUserID_ = null }, { socket, userID, sessionID }) => {
+    /* returns entities by owner */
+    const lookForUserID = lookForUserID_ ? lookForUserID_ : userID; /* Default: MINE */
+
+    const entities = core.db.entities({ owner0: { userID: lookForUserID } }).get();
+    return { code: "ok", entities };
+  };
+
+  const ioUpdate = ({ id, ...rest }, { socket, userID, sessionID }) => {
+    /* let's find out what is this */
+    const inDB = core.db.entities({ id }).get()[0];
+    const now = core.time();
+
+    if (inDB) {
+      if (
+        inDB.owner0 && inDB.owner0.userID == userID || /* Update my own entity */
+        inDB.owner0 && inDB.owner0.access == "public" /* Update public entity */
+      ) {        
+        const dto = { ...ecs.compo.owner0({ userID }), ...rest };
+        dto.owner0.dtModified = now;        
+        core.db.entities({ id }).update(dto);
+        return { code: "ok" };
+      } else {
+        return { code: "fail", details: "No access." };
+      }
+    } else {
+      return { code: "fail", details: "No exists." };
+    }
+  };
+
+  const ioGetPublicRoot = ({}, { socket, userID, sessionID }) => {
+    const entities = core.db.entities({ 
+      owner0: { access: "public" }, 
+      located: { rel: null } 
+    }).get();
+
+    return { code: "ok", entities };
+  };
+
   return {
-    ioDeviceID
+    ioDeviceID, ioSaveEntity, ioByOwner, ioUpdate, ioGetPublicRoot
   };
 };

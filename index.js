@@ -6,7 +6,7 @@ const epochStart = 18761;
  
 const core = {
   config: {
-    wsPort: 4950    
+    wsPort: 4950
   },
   capitalize: s => s.charAt(0).toUpperCase() + s.slice(1),
   microTime: () => new Date().getTime(),
@@ -136,7 +136,7 @@ const log = core.makeLog("Core");
       }
     });
     
-    [ 'main0' /* 'express', 'hub', 'workshop', 'mail', 'marlin', 'epitaffyadmin', 'ecs', 'online', 'gallery' */ ].map(mod => {
+    [ 'express0', 'main0', 'events0'/* 'express', 'hub', 'workshop', 'mail', 'marlin', 'epitaffyadmin', 'ecs', 'online', 'gallery' */ ].map(mod => {
       core.mods[mod] = require(`./mods/${mod}.js`)(core, ecs);
     });
 
@@ -170,17 +170,34 @@ const log = core.makeLog("Core");
       res.end("PropertyLeads Liberty Pylon Alpha Zero");
     };
 
-    const httpServer = require("http").createServer(requestListener);
+    // const httpServer = require("http").createServer(requestListener);
+    // const fs = require("fs");
+    // const options = {
+    //   key: fs.readFileSync('./keys/localhost.key'),
+    //   cert: fs.readFileSync('./keys/localhost.crt')
+    // };
+    // const httpsServer = require("https").createServer(options, requestListener);
+    const { app, httpServer, httpsServer } = core.mods.express0;
+
     const io = require("socket.io")(httpServer, {
       cors: {
         origin: "*", // http://127.0.0.1:8080/
         methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
         allowedHeaders: ["my-custom-header"],
         credentials: true
-      }
+      },      
     });
 
+    io.attach(httpsServer);
+
     core.io = io;
+
+    // const port = 80;
+    // const portSSL = 443;    
+    // httpServer.listen(port); // <== 
+    // httpsServer.listen(portSSL); // <== 
+
+    // core.log("\x1b[35m--[\x1b[04m Yehat Backend \x1b[m\x1b[35m]--[ %s ]--[ %s\x1b[m", core.vTimeNow(), `Listening on port ${port}, ${portSSL} SSL`);    
 
     io.on("connection", (socket) => {
       socket.data = {
@@ -204,7 +221,8 @@ const log = core.makeLog("Core");
 
       socket.use(async (event, next) => {
         if (!Array.isArray(event)) return next();
-        console.log(">=", event[0], JSON.stringify(event[1]).length, 'Bytes');
+
+        // console.log(">=", event[0], JSON.stringify(event[1]).length, 'Bytes');
 
         const fn = event[2];
         const reply = (a) => {
@@ -433,6 +451,8 @@ const log = core.makeLog("Core");
       socket.on("disconnect", (reason) => {
         const { deviceID } = socket.data;
 
+        core.mods.events0.disconnected({ socket });
+
         const user = userFromDeviceID(deviceID);
         if (user) {
           // console.log("disconnected user by deviceID", user);
@@ -455,7 +475,5 @@ const log = core.makeLog("Core");
 
     setInterval(() => {        
       io.to("online0").emit("stat0", onlineStat0.stat0);
-    }, 5000);
-
-    httpServer.listen(80);
+    }, 5000);    
 })();
